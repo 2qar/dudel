@@ -21,6 +21,7 @@ int main() {
 	int color = 0;
 	SDL_Event e;
 	int running = 1;
+	int draw = 0;
 	while (running) {
 		window_surface = SDL_GetWindowSurface(w);
 		if (SDL_WaitEvent(&e)) {
@@ -41,18 +42,22 @@ int main() {
 						break;
 				}
 			} else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button & SDL_BUTTON(SDL_BUTTON_LEFT)) {
-				int x, y;
-				while (SDL_GetMouseState(&x, &y) & SDL_BUTTON(SDL_BUTTON_LEFT)) {
-					SDL_PumpEvents();
-					SDL_Rect mouse = { x-cursor_size/2, y-cursor_size/2, cursor_size, cursor_size };
-					/* TODO: copy window pixels into a backup buffer when mouse is first pressed for CTRL+Z */
-					/* TODO: have a canvas surface so i can draw a mouse cursor thing seperately */
-					SDL_FillRect(window_surface, &mouse, colors[color]);
-					SDL_UpdateWindowSurface(w);
-				}
+				draw = 1;
+			} else if (e.type == SDL_MOUSEBUTTONUP && e.button.button & SDL_BUTTON(SDL_BUTTON_LEFT)) {
+				draw = 0;
 			}
 		}
 
+		if (draw) {
+			SDL_PumpEvents();
+			int x, y;
+			if (SDL_GetMouseState(&x, &y) & SDL_BUTTON(SDL_BUTTON_LEFT)) {
+				SDL_Rect mouse = { x-cursor_size/2, y-cursor_size/2, cursor_size, cursor_size };
+				/* TODO: copy window pixels into a backup buffer when mouse is first pressed for CTRL+Z */
+				/* TODO: have a canvas surface so i can draw a mouse cursor thing seperately */
+				SDL_FillRect(window_surface, &mouse, colors[color]);
+			}
+		}
 		SDL_Rect corner = { 640-32, 480-32, 32, 32 };
 		SDL_FillRect(window_surface, &corner, colors[color]);
 
