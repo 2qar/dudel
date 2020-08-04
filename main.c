@@ -33,7 +33,7 @@ int main() {
 	int running = 1;
 	int draw = 0;
 	int mouse_x = 0, mouse_y = 0;
-	const int cursor_size = 16;
+	int cursor_size = 16;
 	const int cursor_thickness = 1;
 	while (running) {
 		window_surface = SDL_GetWindowSurface(w);
@@ -66,6 +66,11 @@ int main() {
 			} else if (e.type == SDL_MOUSEMOTION) {
 				mouse_x = e.motion.x;
 				mouse_y = e.motion.y;
+			} else if (e.type == SDL_MOUSEWHEEL) {
+				if (e.wheel.y > 0)
+					cursor_size += 1;
+				else
+					cursor_size -= 1;
 			}
 		}
 
