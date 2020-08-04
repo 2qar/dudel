@@ -19,7 +19,11 @@ int main() {
 	 *       allocating more undo buffers will take up a lotta memory (100 undos = 128mb ram) */
 	void *backup = malloc(window_surface->pitch * window_surface->h);
 
-	const int cursor_size = 16;
+	SDL_Surface *canvas = SDL_CreateRGBSurfaceWithFormat(0,
+			window_surface->w, window_surface->h,
+			window_surface->format->BitsPerPixel,
+			window_surface->format->format);
+
 	Uint32 colors[2] = {
 		SDL_MapRGB(window_surface->format, 255, 255, 255),
 		SDL_MapRGB(window_surface->format, 0, 0, 0),
@@ -28,6 +32,9 @@ int main() {
 	SDL_Event e;
 	int running = 1;
 	int draw = 0;
+	int mouse_x = 0, mouse_y = 0;
+	const int cursor_size = 16;
+	const int cursor_thickness = 1;
 	while (running) {
 		window_surface = SDL_GetWindowSurface(w);
 		if (SDL_WaitEvent(&e)) {
@@ -42,20 +49,23 @@ int main() {
 						color = !color;
 						break;
 					case SDL_SCANCODE_R:
-						memset(window_surface->pixels, 0, window_surface->pitch * window_surface->h);
+						memset(canvas->pixels, 0, canvas->pitch * canvas->h);
 						break;
 					case SDL_SCANCODE_Z:
 						if (e.key.keysym.mod & KMOD_CTRL)
-							memcpy(window_surface->pixels, backup, window_surface->pitch * window_surface->h);
+							memcpy(canvas->pixels, backup, canvas->pitch * canvas->h);
 						break;
 					default:
 						break;
 				}
 			} else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button & SDL_BUTTON(SDL_BUTTON_LEFT)) {
 				draw = 1;
-				memcpy(backup, window_surface->pixels, window_surface->pitch * window_surface->h);
+				memcpy(backup, canvas->pixels, canvas->pitch * canvas->h);
 			} else if (e.type == SDL_MOUSEBUTTONUP && e.button.button & SDL_BUTTON(SDL_BUTTON_LEFT)) {
 				draw = 0;
+			} else if (e.type == SDL_MOUSEMOTION) {
+				mouse_x = e.motion.x;
+				mouse_y = e.motion.y;
 			}
 		}
 
@@ -64,17 +74,37 @@ int main() {
 			int x, y;
 			if (SDL_GetMouseState(&x, &y) & SDL_BUTTON(SDL_BUTTON_LEFT)) {
 				SDL_Rect mouse = { x-cursor_size/2, y-cursor_size/2, cursor_size, cursor_size };
-				/* TODO: have a canvas surface so i can draw a mouse cursor thing seperately */
-				SDL_FillRect(window_surface, &mouse, colors[color]);
+				SDL_FillRect(canvas, &mouse, colors[color]);
 			}
 		}
-		SDL_Rect corner = { 640-32, 480-32, 32, 32 };
+
+		SDL_Rect window_size = { 0, 0, window_surface->w, window_surface->h };
+		SDL_BlitSurface(canvas, &window_size, window_surface, &window_size);
+
+		SDL_Rect corner = { window_surface->w-32, window_surface->h-32, 32, 32 };
 		SDL_FillRect(window_surface, &corner, colors[color]);
+
+		/* draw the cursor */
+		SDL_Rect cursor = { mouse_x, mouse_y, 0, 0 };
+		cursor.x -= cursor_size / 2;
+		cursor.y -= cursor_size / 2;
+		cursor.w = cursor_size;
+		cursor.h = cursor_thickness;
+		SDL_FillRect(window_surface, &cursor, colors[color]);
+		cursor.y += cursor_size;
+		SDL_FillRect(window_surface, &cursor, colors[color]);
+		cursor.y -= cursor_size;
+		cursor.h = cursor.w;
+		cursor.w = cursor_thickness;
+		SDL_FillRect(window_surface, &cursor, colors[color]);
+		cursor.x += cursor_size;
+		SDL_FillRect(window_surface, &cursor, colors[color]);
 
 		SDL_UpdateWindowSurface(w);
 	}
 
 	free(backup);
+	SDL_FreeSurface(canvas);
 	SDL_DestroyWindow(w);
 	SDL_Quit();
 	return 0;
