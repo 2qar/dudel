@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <SDL2/SDL.h>
 
 int main() {
@@ -12,8 +13,13 @@ int main() {
 		return 1;
 	}
 
-	const int cursor_size = 16;
 	SDL_Surface *window_surface = SDL_GetWindowSurface(w);
+	SDL_Log("buf size is %d", window_surface->pitch * window_surface->h);
+	/* TODO: more undos, but find a smart way to do it.
+	 *       allocating more undo buffers will take up a lotta memory (100 undos = 128mb ram) */
+	void *backup = malloc(window_surface->pitch * window_surface->h);
+
+	const int cursor_size = 16;
 	Uint32 colors[2] = {
 		SDL_MapRGB(window_surface->format, 255, 255, 255),
 		SDL_MapRGB(window_surface->format, 0, 0, 0),
@@ -38,11 +44,16 @@ int main() {
 					case SDL_SCANCODE_R:
 						memset(window_surface->pixels, 0, window_surface->pitch * window_surface->h);
 						break;
+					case SDL_SCANCODE_Z:
+						if (e.key.keysym.mod & KMOD_CTRL)
+							memcpy(window_surface->pixels, backup, window_surface->pitch * window_surface->h);
+						break;
 					default:
 						break;
 				}
 			} else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button & SDL_BUTTON(SDL_BUTTON_LEFT)) {
 				draw = 1;
+				memcpy(backup, window_surface->pixels, window_surface->pitch * window_surface->h);
 			} else if (e.type == SDL_MOUSEBUTTONUP && e.button.button & SDL_BUTTON(SDL_BUTTON_LEFT)) {
 				draw = 0;
 			}
@@ -53,7 +64,6 @@ int main() {
 			int x, y;
 			if (SDL_GetMouseState(&x, &y) & SDL_BUTTON(SDL_BUTTON_LEFT)) {
 				SDL_Rect mouse = { x-cursor_size/2, y-cursor_size/2, cursor_size, cursor_size };
-				/* TODO: copy window pixels into a backup buffer when mouse is first pressed for CTRL+Z */
 				/* TODO: have a canvas surface so i can draw a mouse cursor thing seperately */
 				SDL_FillRect(window_surface, &mouse, colors[color]);
 			}
@@ -64,6 +74,7 @@ int main() {
 		SDL_UpdateWindowSurface(w);
 	}
 
+	free(backup);
 	SDL_DestroyWindow(w);
 	SDL_Quit();
 	return 0;
