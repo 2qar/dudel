@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <SDL2/SDL.h>
 
+#define UNDO_HISTORY_LEN 10
+
 int main() {
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
 		SDL_Log("error initalizing video: %s", SDL_GetError());
@@ -14,10 +16,9 @@ int main() {
 	}
 
 	SDL_Surface *window_surface = SDL_GetWindowSurface(w);
-	SDL_Log("buf size is %d", window_surface->pitch * window_surface->h);
-	/* TODO: more undos, but find a smart way to do it.
-	 *       allocating more undo buffers will take up a lotta memory (100 undos = 128mb ram) */
-	void *backup = malloc(window_surface->pitch * window_surface->h);
+	int undo_index = -1;
+	/* TODO: find a smarter way to do undo actions than just snapshotting the canvas before drawing */
+	void **undo_buffers = calloc(UNDO_HISTORY_LEN, sizeof(void *));
 
 	SDL_Surface *canvas = SDL_CreateRGBSurfaceWithFormat(0,
 			window_surface->w, window_surface->h,
@@ -52,15 +53,22 @@ int main() {
 						memset(canvas->pixels, 0, canvas->pitch * canvas->h);
 						break;
 					case SDL_SCANCODE_Z:
-						if (e.key.keysym.mod & KMOD_CTRL)
-							memcpy(canvas->pixels, backup, canvas->pitch * canvas->h);
+						if (e.key.keysym.mod & KMOD_CTRL && undo_index != -1)
+							memcpy(canvas->pixels, undo_buffers[undo_index--], canvas->pitch * canvas->h);
 						break;
 					default:
 						break;
 				}
 			} else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button & SDL_BUTTON(SDL_BUTTON_LEFT)) {
 				draw = 1;
-				memcpy(backup, canvas->pixels, canvas->pitch * canvas->h);
+				if (undo_index == UNDO_HISTORY_LEN - 1) {
+					void *first = undo_buffers[0];
+					for (int i = 1; i < UNDO_HISTORY_LEN; ++i)
+						undo_buffers[i-1] = undo_buffers[i];
+					undo_buffers[UNDO_HISTORY_LEN-1] = first;
+				} else if (undo_buffers[++undo_index] == NULL)
+					undo_buffers[undo_index] = malloc(canvas->pitch * canvas->h);
+				memcpy(undo_buffers[undo_index], canvas->pixels, canvas->pitch * canvas->h);
 			} else if (e.type == SDL_MOUSEBUTTONUP && e.button.button & SDL_BUTTON(SDL_BUTTON_LEFT)) {
 				draw = 0;
 			} else if (e.type == SDL_MOUSEMOTION) {
@@ -108,7 +116,10 @@ int main() {
 		SDL_UpdateWindowSurface(w);
 	}
 
-	free(backup);
+	for (int i = 0; i < UNDO_HISTORY_LEN; ++i)
+		if (undo_buffers[i] != NULL)
+			free(undo_buffers[i]);
+	free(undo_buffers);
 	SDL_FreeSurface(canvas);
 	SDL_DestroyWindow(w);
 	SDL_Quit();
